@@ -1,11 +1,10 @@
 import requests
-from dotenv import load_dotenv
+import pandas as pd
 import os
 import pandas as pd
 
 # Load the token from the .env file
-load_dotenv(".env")
-auth_token = os.getenv("AUTH_TOKEN")
+auth_token = os.environ.get("AUTH_TOKEN")
 
 if not auth_token:
     raise ValueError("Authorization token not found in .env file. Please log in first.")
@@ -30,9 +29,10 @@ def fetch_public_station_data(skip=0, take=500):
         print(response.text)
         return None
 
-# Main logic to fetch paginated data
+all_step_dfs = []
+
 skip = 0
-take = 2
+take = 1500
 
 data = fetch_public_station_data(skip=skip, take=take)
 
@@ -41,6 +41,77 @@ if data==None:
     exit()
 print(f"Total records fetched: {len(data)}")
 
+df_data = {'loc_id':[],'lat':[],'lon':[],'elevation':[],'time_stamp':[], 'no2':[], 'w':[], 't':[],  'AQI-IN':[], 'pm10':[], 'aqi':[], 'co':[], 'p':[],  'pm25':[], 'wg':[], 'h':[], 'o3':[]}
+all_loc_df = {'main_loc_id':[]}
 for loc in data["Locations"]:
-    print(loc["stationname"])
-    print(loc["locationId"])
+    print(loc['lat'],loc['lon'],loc['Elevation'])
+    #print(loc["locationId"])
+
+
+
+# Initialize a dictionary to hold data for all locations
+all_data_frames = []
+
+# Loop through each location in the data
+for loc in data["Locations"]:
+    lat = loc["lat"]
+    lon = loc["lon"]
+    eleva = loc["Elevation"]
+    locationid = loc["locationId"]
+
+    # Initialize a temporary dictionary for the current location
+    loc_data = {
+        "loc_id": [],
+        "lat": [],
+        "lon": [],
+        "elevation": [],
+        "time_stamp": [],
+        "no2": [],
+        "w": [],
+        "t": [],
+        "AQI-IN": [],
+        "pm10": [],
+        "aqi": [],
+        "co": [],
+        "p": [],
+        "pm25": [],
+        "wg": [],
+        "h": [],
+        "o3": [],
+    }
+
+    # Process past data for the current location
+    for past_data in loc["pastdata"]:
+        for single_data in past_data:
+            created_at = single_data["created_at"]
+
+            # Check if timestamp is already present
+            if created_at not in loc_data["time_stamp"]:
+                # Add a new row with timestamp and placeholders
+                loc_data["time_stamp"].append(created_at)
+                for key in loc_data.keys():
+                    if key not in ["time_stamp"]:
+                        loc_data[key].append(None)
+
+            # Find the index of the current timestamp
+            idx = loc_data["time_stamp"].index(created_at)
+
+            # Update sensor data if applicable
+            sensorname = single_data["sensorname"]
+            if sensorname in loc_data:
+                loc_data[sensorname][idx] = single_data["sensorvalue"]
+
+            # Populate static location details
+            if not loc_data["lat"][idx] == lat:
+                loc_data["lat"][idx] = lat
+                loc_data["lon"][idx] = lon
+                loc_data["elevation"][idx] = eleva
+                loc_data["loc_id"][idx] = locationid
+
+    # Convert the location data to a DataFrame and append it to the list
+    loc_df = pd.DataFrame(loc_data)
+    all_data_frames.append(loc_df)
+
+# Combine all DataFrames into one
+final_df = pd.concat(all_data_frames, ignore_index=True)
+final_df.to_csv('combined_data.csv',index=False)
