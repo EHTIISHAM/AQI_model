@@ -119,15 +119,26 @@ df_data = {
 }
 
 # Fetch data
-skip = 0
-take = 1500
-data = fetch_public_station_data(skip=skip, take=take)
+data = {"Locations":[]}
+uid_chk = []
+
+for i in range(0,15000,500):
+    data1 = fetch_public_station_data(skip=i, take=500)
+    
+    for locs in data1["Locations"]:
+        if locs["locationId"] in uid_chk:
+            print("same_uid_found")
+            continue
+        uid_chk.append(locs["locationId"])
+        data["Locations"].append(locs)
+        
+
 
 if data is None:
     print("No Data Exiting")
     exit()
 
-print(f"Total records fetched: {len(data)}")
+print(f"Total records fetched: {len(uid_chk)}")
 
 # Process each location
 for loc in data["Locations"]:

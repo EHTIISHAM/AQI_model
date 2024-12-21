@@ -22,7 +22,7 @@ def fetch_public_station_data(skip=0, take=500):
 
     if response.status_code == 200:
         data = response.json()
-        print(f"Data fetched for skip={skip}, take={take}. Total records: {len(data)}")
+        #print(f"Data fetched for skip={skip}, take={take}. Total records: {len(data)}")
         return data
     else:
         print(f"Error: Failed to fetch data for skip={skip}, take={take}. Status code: {response.status_code}")
@@ -31,15 +31,25 @@ def fetch_public_station_data(skip=0, take=500):
 
 all_step_dfs = []
 
-skip = 0
-take = 1500
+data = {"Locations":[]}
+uid_chk = []
 
-data = fetch_public_station_data(skip=skip, take=take)
+for i in range(0,15000,500):
+    data1 = fetch_public_station_data(skip=i, take=500)
+    
+    for locs in data1["Locations"]:
+        if locs["locationId"] in uid_chk:
+            print("same_uid_found")
+            continue
+        uid_chk.append(locs["locationId"])
+        data["Locations"].append(locs)
+
 
 if data==None:
     print("No Data Exiting")
     exit()
-print(f"Total records fetched: {len(data)}")
+total_stations = data["Locations"]
+print(f"Total records fetched: {len(total_stations)}")
 
 df_data = {'loc_id':[],'lat':[],'lon':[],'elevation':[],'time_stamp':[], 'no2':[], 'w':[], 't':[],  'AQI-IN':[], 'pm10':[], 'aqi':[], 'co':[], 'p':[],  'pm25':[], 'wg':[], 'h':[], 'o3':[]}
 all_loc_df = {'main_loc_id':[]}
