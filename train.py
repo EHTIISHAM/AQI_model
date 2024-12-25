@@ -8,9 +8,9 @@ from data_pipelines import pipeline_demo
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 
 # Ensure X and Y are NumPy arrays
-X ,Y = pipeline_demo('combined_data.csv')
-X = np.array(X)
-Y = np.array(Y)
+X = np.load("X.npy")
+Y = np.load("Y.npy")
+
 
 # Split into train and test sets
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)

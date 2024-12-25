@@ -11,6 +11,9 @@ import tensorflow as tf
 
 from data_pipelines import pollutant_ranges, normalize_data_with_range
 
+from datetime import datetime, timezone
+UTC_time = datetime.now(timezone.utc)
+
 # Load the token from the .env file
 auth_token = os.environ.get("AUTH_TOKEN")
 
@@ -72,7 +75,7 @@ def find_near_stations_manual(df, lat, lon, target_loc_id, max_distance=3, k=Non
     return filtered_df["loc_id"].values
 
 
-def create_location_neighbors(df,locations_list, max_distance=3, k=5):
+def create_location_neighbors(df,locations_list, max_distance=5, k=5):
     """
     Create a dictionary where each loc_id (index in the list) maps to its nearby station loc_ids.
     """
@@ -210,17 +213,18 @@ model = tf.keras.models.load_model("best_model.keras")
 
 # DataFrames: sensor_df is your real-time data, df_results will store results
 df_results = pd.DataFrame(columns=['loc_id', 'time_stamp'] + list(pollutant_ranges.keys()))
-
+loc_id_list = []
+Y = []
 # Process each main location
 for main_loc_id, near_loc_ids in near_location.items():
     # Fetch main loc_id data
     main_data = sensor_df[sensor_df["loc_id"] == main_loc_id]
 
-    if len(near_loc_ids) < 5:
+    if len(near_loc_ids) < 1:
         # If less than 5 neighbors, append zeros
         result_row = {key: 0 for key in pollutant_ranges.keys()}
         result_row['loc_id'] = main_loc_id
-        result_row['time_stamp'] = main_data['time_stamp'].iloc[0] if not main_data.empty else None
+        result_row['time_stamp'] = UTC_time if not main_data.empty else None
         result_df = pd.DataFrame([result_row])  # Convert the row into a DataFrame
         df_results = pd.concat([df_results, result_df], ignore_index=True)
         continue
@@ -229,39 +233,53 @@ for main_loc_id, near_loc_ids in near_location.items():
     near_data = sensor_df[sensor_df["loc_id"].isin(near_loc_ids)]
 
     # If near_loc_id data is insufficient, append zeros
-    if len(near_data) < 5:
+    """if len(near_data) < 5:
         result_row = {key: 0 for key in pollutant_ranges.keys()}
         result_row['loc_id'] = main_loc_id
-        result_row['time_stamp'] = main_data['time_stamp'].iloc[0] if not main_data.empty else None
+        result_row['time_stamp'] = UTC_time if not main_data.empty else None
         result_df = pd.DataFrame([result_row])  # Convert the row into a DataFrame
         df_results = pd.concat([df_results, result_df], ignore_index=True)
-        continue
+        continue"""
 
     # Prepare input for the model (flatten values for Y)
-    Y = near_data[list(pollutant_ranges.keys())].iloc[:5].values
-    if len(Y) >60:
+    Y1 = near_data[list(pollutant_ranges.keys())].iloc[:5].values
+    if len(Y1) >5:
         print("len_decreased")
-        Y = Y[:60]  # Ensure fixed-size input (5 neighbors x 12 pollutants = 60 features)
-    Y = np.expand_dims(Y, axis=0)
+        Y1 = Y1[:5]  # Ensure fixed-size input (5 neighbors x 12 pollutants = 60 features)
+    if len(Y1) < 5:
+        Y1 = np.concatenate([Y1, np.zeros((5 - len(Y1), len(pollutant_ranges)))])
+    Y.append(Y1)
+    loc_id_list.append(main_loc_id)
+Y = np.array(Y)
     # Predict pollutants
-    predicted_values = model.predict(Y)  # Reshape for a single prediction
-    predicted_values = predicted_values.flatten()
+print(Y.shape)
+predicted_values = model.predict(Y)  # Reshape for a single prediction
+#predicted_values = predicted_values.flatten()
+print(predicted_values.shape)
+np.savez('predicted_values.npz', predicted_values)
 
+# Process predictions and append to results
+for i, main_loc_id in enumerate(loc_id_list):
+    predicted_row = predicted_values[i]  # Shape: (12,)
+    
     # Denormalize predicted values
     denormalized_values = [
-        denormalize_data(predicted_values[i], pollutant_ranges[col])
-        for i, col in enumerate(pollutant_ranges.keys())
+        max(0.0012, denormalize_data(predicted_row[j], pollutant_ranges[col]))
+        if col != "t" else denormalize_data(predicted_row[j], pollutant_ranges[col])
+        for j, col in enumerate(pollutant_ranges.keys())
     ]
-
+    
     # Append results to df_results
-    result_row = {col: denormalized_values[i] for i, col in enumerate(pollutant_ranges.keys())}
+    result_row = {col: denormalized_values[j] for j, col in enumerate(pollutant_ranges.keys())}
     result_row['loc_id'] = main_loc_id
-    result_row['time_stamp'] = main_data['time_stamp'].iloc[0] if not main_data.empty else None
+    result_row['time_stamp'] = UTC_time
     result_df = pd.DataFrame([result_row])  # Convert the row into a DataFrame
     df_results = pd.concat([df_results, result_df], ignore_index=True)
-
 
 # Final Results
 print("Processed Results:")
 print(df_results.head())
-df_results.to_csv('station_live_prediction.csv')
+
+# Save to CSV
+df_results.to_csv('station_live_prediction.csv', index=False)
+#df_results.to_csv('station_live_prediction.csv')

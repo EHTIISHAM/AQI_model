@@ -84,17 +84,17 @@ pollutant_ranges = {
     "w": (0, 76.84),
     "t": (-100, 50.9),
     "AQI-IN": (0, 500),
-    "pm10": (0, 510),
+    "pm10": (1, 510),
     "aqi": (0, 300),
     "co": (0, 50000),
     "p": (940, 1046),
-    "pm25": (0, 380),
+    "pm25": (1, 380),
     "wg": (0, 140),
     "h": (0, 90),
     "o3": (0, 1250),
 }
 
-def create_location_neighbors(df, max_distance=3, k=None):
+def create_location_neighbors(df, max_distance=5, k=None):
     """
     Create a dictionary where each loc_id maps to its nearby station loc_ids.
     """
@@ -198,7 +198,7 @@ def pipeline_demo(path_to_csv):
             # Find the target row for the given `loc_id`
             target_row_index = hour_df.index[hour_df["loc_id"] == loc_id].tolist()
             if not target_row_index:
-                print(f"Skipping hour {hour} for loc_id {loc_id} (target row not found)")
+                #print(f"Skipping hour {hour} for loc_id {loc_id} (target row not found)")
                 continue
 
             # Target row is the one matching `loc_id`
@@ -224,7 +224,7 @@ def pipeline_demo(path_to_csv):
 
             # Validate the number of rows for predictors
             if predictors_df.shape[0] != 5:  # Ensure we have data for 5 stations
-                print(f"Warning: Skipping hour {hour} for loc_id {loc_id} due to insufficient stations in hourly data")
+                #print(f"Warning: Skipping hour {hour} for loc_id {loc_id} due to insufficient stations in hourly data")
                 continue
             if 'Unnamed: 0' in predictors_df.columns:
                 print("found Unamed: 0 removing it")
@@ -239,3 +239,9 @@ def pipeline_demo(path_to_csv):
     print(f"Processed {len(X)} samples for X and {len(Y)} samples for Y")
     
     return X, Y
+
+if __name__ == '__main__':
+    X, Y = pipeline_demo("combined_data.csv")
+    np.save("X.npy",X)
+    np.save("Y.npy",Y)
+    
