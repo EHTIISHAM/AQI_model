@@ -220,7 +220,7 @@ for main_loc_id, near_loc_ids in near_location.items():
     # Fetch main loc_id data
     main_data = sensor_df[sensor_df["loc_id"] == main_loc_id]
 
-    if len(near_loc_ids) < 1:
+    if len(near_loc_ids) < 0:
         # If less than 5 neighbors, append zeros
         result_row = {key: 0 for key in pollutant_ranges.keys()}
         result_row['loc_id'] = main_loc_id

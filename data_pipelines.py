@@ -223,9 +223,14 @@ def pipeline_demo(path_to_csv):
                 continue
 
             # Validate the number of rows for predictors
-            if predictors_df.shape[0] != 5:  # Ensure we have data for 5 stations
+            if predictors_df.shape[0] <= 1:
+                continue  # Skip this hour if only one row is present  
+            if predictors_df.shape[0] < 5:  # Ensure we have data for 5 stations
+                # ADD zero padding
+                predictors_df = pd.concat([predictors_df,pd.DataFrame(np.zeros((5-predictors_df.shape[0],predictors_df.shape[1])),columns=predictors_df.columns)],axis=0)
+                #print(predictors_df.shape[0])
                 #print(f"Warning: Skipping hour {hour} for loc_id {loc_id} due to insufficient stations in hourly data")
-                continue
+                
             if 'Unnamed: 0' in predictors_df.columns:
                 print("found Unamed: 0 removing it")
                 predictors_df = predictors_df.drop(columns=['Unnamed: 0'])
