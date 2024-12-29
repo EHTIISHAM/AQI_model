@@ -10,8 +10,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 # Ensure X and Y are NumPy arrays
 X = np.load("X.npy")
 Y = np.load("Y.npy")
-
-
+print(X.shape, Y.shape)
 # Split into train and test sets
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 
@@ -22,7 +21,8 @@ X_test = X_test.reshape((X_test.shape[0], 5, n_features))
 
 # Define LSTM model
 model = Sequential([
-    LSTM(128, activation='relu', input_shape=(5, n_features)),
+    LSTM(128, activation='relu', input_shape=(5, n_features
+                                              )),
     Dense(64, activation='relu'),
     Dense(32, activation='relu'),
     Dense(Y_train.shape[1])  # Output layer matches the target size

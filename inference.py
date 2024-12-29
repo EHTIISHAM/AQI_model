@@ -188,11 +188,11 @@ for loc in data["Locations"]:
 
 
 # Convert to DataFrame
-pollutant_columns = ["no2", "w", "t", "AQI-IN", "pm10", "aqi", "co", "p", "pm25", "wg", "h", "o3"]
+pollutant_columns = ["elevation","no2", "w", "t", "AQI-IN", "pm10", "aqi", "co", "p", "pm25", "wg", "h", "o3"]
 
 sensor_df = pd.DataFrame(df_data)
 sensor_df = normalize_data_with_range(sensor_df, pollutant_columns, pollutant_ranges)
-
+#sensor_df['elevation'] = (sensor_df['elevation'] - sensor_df['elevation'].min()) / (sensor_df['elevation'].max() - sensor_df['elevation'].min())
 # Display summary
 print("Processed DataFrame:")
 print(sensor_df.head())
@@ -245,19 +245,33 @@ for main_loc_id, near_loc_ids in near_location.items():
     Y1 = near_data[list(pollutant_ranges.keys())].iloc[:5].values
     if len(Y1) >5:
         print("len_decreased")
-        Y1 = Y1[:5]  # Ensure fixed-size input (5 neighbors x 12 pollutants = 60 features)
+        Y1 = Y1[:5]  # Ensure fixed-size input (5 neighbors x 13 pollutants = 65 features)
     if len(Y1) < 5:
         Y1 = np.concatenate([Y1, np.zeros((5 - len(Y1), len(pollutant_ranges)))])
     Y.append(Y1)
     loc_id_list.append(main_loc_id)
 Y = np.array(Y)
     # Predict pollutants
+print(Y[1])
 print(Y.shape)
 predicted_values = model.predict(Y)  # Reshape for a single prediction
 #predicted_values = predicted_values.flatten()
 print(predicted_values.shape)
 np.savez('predicted_values.npz', predicted_values)
-
+pollutant_ranges = {
+    "no2": (0, 500),
+    "w": (0, 76.84),
+    "t": (-100, 50.9),
+    "AQI-IN": (0, 500),
+    "pm10": (1, 510),
+    "aqi": (0, 300),
+    "co": (0, 50000),
+    "p": (940, 1046),
+    "pm25": (1, 380),
+    "wg": (0, 140),
+    "h": (0, 90),
+    "o3": (0, 1250),
+}
 # Process predictions and append to results
 for i, main_loc_id in enumerate(loc_id_list):
     predicted_row = predicted_values[i]  # Shape: (12,)
@@ -279,6 +293,7 @@ for i, main_loc_id in enumerate(loc_id_list):
 # Final Results
 print("Processed Results:")
 print(df_results.head())
+df_results.drop(['elevation'], axis=1, inplace=True)
 
 # Save to CSV
 df_results.to_csv('station_live_prediction.csv', index=False)

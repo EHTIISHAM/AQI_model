@@ -120,7 +120,9 @@ for loc in data["Locations"]:
 
     # Convert the location data to a DataFrame and append it to the list
     loc_df = pd.DataFrame(loc_data)
+    loc_df.to_csv(f"loc_{locationid}.csv", index=False)
     all_data_frames.append(loc_df)
+    exit()
 
 # Combine all DataFrames into one
 final_df = pd.concat(all_data_frames, ignore_index=True)

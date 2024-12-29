@@ -3,6 +3,8 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 from datetime import datetime, timedelta
 from sklearn.preprocessing import MinMaxScaler
+import multiprocessing as mp
+
 
 # Create groups based on location and time
 def find_near_stations_knn(df, lat, lon, target_loc_id, k=5):
@@ -92,6 +94,8 @@ pollutant_ranges = {
     "wg": (0, 140),
     "h": (0, 90),
     "o3": (0, 1250),
+    "elevation": (0, 10000)
+
 }
 
 def create_location_neighbors(df, max_distance=5, k=None):
@@ -167,17 +171,19 @@ def pipeline_demo(path_to_csv):
     """
     # Generate random data
     raw_data = pd.read_csv(path_to_csv)
-    if 'Unnamed: 0' in raw_data.columns:
-        print("found Unamed: 0 in raw data removing it")
-        predictors_df = raw_data.drop(columns=['Unnamed: 0'])
+    raw_data = raw_data.iloc[:50000]
+    print("data Read")
 
     # Normalize pollutant data
-    pollutant_columns = ["no2", "w", "t", "AQI-IN", "pm10", "aqi", "co", "p", "pm25", "wg", "h", "o3"]
+    pollutant_columns = ["elevation","no2", "w", "t", "AQI-IN", "pm10", "aqi", "co", "p", "pm25", "wg", "h", "o3"]
     normalized_data = normalize_data_with_range(raw_data.copy(), pollutant_columns,pollutant_ranges)
+    print("Normalization Done")
     # Example group creation for a random station and timestamp
     loc_dict = create_location_neighbors(normalized_data,k=5)
+    print("Near Locations Found")
     #print(loc_dict.keys())
     hourly_dfs = generate_hourly_df(normalized_data,loc_dict)
+    print("Hourly Data Generated")
     #print(hourly_dfs.get(364))
     output_path = "loc_336_hourly_data.csv"
     #hourly_dfs[336].to_csv(output_path, index=False)
@@ -208,17 +214,18 @@ def pipeline_demo(path_to_csv):
             hour_df = hour_df.drop(columns=["time_stamp"])
 
             # Predictors are all rows excluding the target row
-            predictors_df = hour_df.drop(index=target_row_index).drop(columns=["lat", "lon", "elevation", "loc_id","hour"])
+            predictors_df = hour_df.drop(index=target_row_index).drop(columns=["lat", "lon", "loc_id","hour"])
 
             # Replace NaN values with 0 in predictors and target
             #predictors_df = predictors_df.fillna(0)
             #target_row = target_row.fillna(0)
 
+
             # Target vector contains only pollutant values for the target row
-            target_values = target_row.drop(["lat", "lon", "elevation", "loc_id","time_stamp","hour"]).values.astype(float)
+            target_values = target_row.drop(["lat","elevation", "lon", "loc_id","time_stamp","hour"]).values.astype(float)
 
             # Validate the predictors DataFrame shape
-            if predictors_df.shape[1] != len(target_values):  # Ensure feature count matches
+            if predictors_df.shape[1] != len(target_values)+1:  # Ensure feature count matches
                 print(f"Warning: Skipping hour {hour} for loc_id {loc_id} due to invalid X shape")
                 continue
 
@@ -231,9 +238,7 @@ def pipeline_demo(path_to_csv):
                 #print(predictors_df.shape[0])
                 #print(f"Warning: Skipping hour {hour} for loc_id {loc_id} due to insufficient stations in hourly data")
                 
-            if 'Unnamed: 0' in predictors_df.columns:
-                print("found Unamed: 0 removing it")
-                predictors_df = predictors_df.drop(columns=['Unnamed: 0'])
+
             # Append to X and Y
             X.append(predictors_df.values.flatten())  # Flatten predictors to match the required shape
             Y.append(target_values)
@@ -245,8 +250,25 @@ def pipeline_demo(path_to_csv):
     
     return X, Y
 
+
+def process_data(file_name):
+    """
+    Function to load data and process it using the pipeline_demo function.
+    Saves the processed X and Y as .npy files.
+    """
+    X, Y = pipeline_demo(file_name)
+    np.save("X.npy", X)
+    np.save("Y.npy", Y)
+    print(f"Data processing complete for {file_name}. Files saved as X.npy and Y.npy.")
+
+
+
 if __name__ == '__main__':
-    X, Y = pipeline_demo("combined_data.csv")
-    np.save("X.npy",X)
-    np.save("Y.npy",Y)
-    
+    # Input file(s) to process
+    file_names = ["combined_data.csv"]  # List files here if there are multiple files to process
+
+    # Create a pool of workers
+    with mp.Pool(processes=mp.cpu_count()) as pool:
+        pool.map(process_data, file_names)
+
+    print("All tasks completed.")
